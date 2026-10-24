@@ -10,6 +10,7 @@
     "build:web": "vite build --config web/vite.config.ts",
     "check:web": "tsc --noEmit",
     "test:config": "node --no-experimental-webstorage scripts/config-smoke.mjs",
+    "test:retention": "node --no-experimental-webstorage scripts/retention-smoke.mjs",
     "test:integration": "node --no-experimental-webstorage scripts/verify.mjs",
     "test:browser": "node --no-experimental-webstorage scripts/browser-smoke.mjs"
   },

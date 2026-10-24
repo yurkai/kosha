@@ -10,6 +10,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"kosha/internal/server"
 )
@@ -55,10 +56,11 @@ KOSHA_MAX_ROOMS=7
 KOSHA_MAX_PEERS=8
 KOSHA_MAX_MESSAGE_BYTES=65536
 KOSHA_METRICS=true
+KOSHA_ROOM_TTL=45m
 `)
 	want := server.Config{
 		Address: "[::1]:3107", Database: "data/local room.db", MaxRooms: 7,
-		MaxPeers: 8, MaxMessageBytes: 65536, Metrics: true,
+		MaxPeers: 8, MaxMessageBytes: 65536, Metrics: true, RoomTTL: 45 * time.Minute,
 	}
 	for _, tc := range []struct {
 		name string
@@ -70,12 +72,14 @@ KOSHA_METRICS=true
 		{name: "process", env: map[string]string{
 			"KOSHA_HOST": "127.0.0.2", "KOSHA_PORT": "4107", "KOSHA_DATABASE": "process.db",
 			"KOSHA_MAX_ROOMS": "9", "KOSHA_MAX_PEERS": "10", "KOSHA_MAX_MESSAGE_BYTES": "32768", "KOSHA_METRICS": "false",
-		}, want: server.Config{Address: "127.0.0.2:4107", Database: "process.db", MaxRooms: 9, MaxPeers: 10, MaxMessageBytes: 32768}},
+			"KOSHA_ROOM_TTL": "24h",
+		}, want: server.Config{Address: "127.0.0.2:4107", Database: "process.db", MaxRooms: 9, MaxPeers: 10, MaxMessageBytes: 32768, RoomTTL: 24 * time.Hour}},
 		{name: "flags", env: map[string]string{
 			"KOSHA_PORT": "invalid", "KOSHA_DATABASE": "", "KOSHA_MAX_ROOMS": "invalid",
 			"KOSHA_MAX_PEERS": "invalid", "KOSHA_MAX_MESSAGE_BYTES": "invalid", "KOSHA_METRICS": "invalid",
-		}, args: []string{"-addr", "127.0.0.1:0", "-db", "flags.db", "-max-rooms", "3", "-max-peers", "4", "-max-message-bytes", "8192", "-metrics=false"},
-			want: server.Config{Address: "127.0.0.1:0", Database: "flags.db", MaxRooms: 3, MaxPeers: 4, MaxMessageBytes: 8192}},
+			"KOSHA_ROOM_TTL": "invalid",
+		}, args: []string{"-addr", "127.0.0.1:0", "-db", "flags.db", "-max-rooms", "3", "-max-peers", "4", "-max-message-bytes", "8192", "-metrics=false", "-room-ttl", "3h"},
+			want: server.Config{Address: "127.0.0.1:0", Database: "flags.db", MaxRooms: 3, MaxPeers: 4, MaxMessageBytes: 8192, RoomTTL: 3 * time.Hour}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			args := append([]string{"-env-file", path}, tc.args...)
@@ -120,6 +124,7 @@ func TestConfigRejectsInvalidSettings(t *testing.T) {
 		{"KOSHA_HOST", "host:1234"}, {"KOSHA_DATABASE", ""}, {"KOSHA_DATABASE", ":memory:"},
 		{"KOSHA_MAX_ROOMS", "abc"}, {"KOSHA_MAX_ROOMS", "0"}, {"KOSHA_MAX_PEERS", "101"},
 		{"KOSHA_MAX_MESSAGE_BYTES", "-1"}, {"KOSHA_MAX_MESSAGE_BYTES", "1MiB"}, {"KOSHA_METRICS", "yes"},
+		{"KOSHA_ROOM_TTL", ""}, {"KOSHA_ROOM_TTL", "0"}, {"KOSHA_ROOM_TTL", "-24h"}, {"KOSHA_ROOM_TTL", "14d"},
 	} {
 		t.Run(tc.key+"="+tc.value, func(t *testing.T) {
 			_, err := parseConfig([]string{"-env-file", ""}, lookup(map[string]string{tc.key: tc.value}), io.Discard)

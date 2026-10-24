@@ -26,6 +26,7 @@ func parseConfig(args []string, lookupEnv func(string) (string, bool), output io
 	flags.IntVar(&cfg.MaxPeers, "max-peers", cfg.MaxPeers, "maximum participants per room")
 	flags.Int64Var(&cfg.MaxMessageBytes, "max-message-bytes", cfg.MaxMessageBytes, "maximum incoming WebSocket message size")
 	flags.BoolVar(&cfg.Metrics, "metrics", cfg.Metrics, "enable diagnostic /debug/metrics (keep private)")
+	flags.DurationVar(&cfg.RoomTTL, "room-ttl", cfg.RoomTTL, "inactive room retention (e.g. 336h for 14 days)")
 	if err := flags.Parse(args); err != nil {
 		return cfg, err
 	}
@@ -70,6 +71,7 @@ func parseConfig(args []string, lookupEnv func(string) (string, bool), output io
 		{"KOSHA_DATABASE", "db"}, {"KOSHA_MAX_ROOMS", "max-rooms"},
 		{"KOSHA_MAX_PEERS", "max-peers"}, {"KOSHA_MAX_MESSAGE_BYTES", "max-message-bytes"},
 		{"KOSHA_METRICS", "metrics"},
+		{"KOSHA_ROOM_TTL", "room-ttl"},
 	} {
 		if explicit[setting.flag] {
 			continue
