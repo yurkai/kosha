@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
-import { mkdir, mkdtemp } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { chromium } from 'playwright'
-import { startServer, waitFor } from './lib/harness.mjs'
+import { startServer, waitFor, sleep } from './lib/harness.mjs'
 
 await mkdir('artifacts', { recursive: true })
 const dir = await mkdtemp(resolve('artifacts/browser-'))
@@ -84,6 +84,44 @@ try {
   await page.screenshot({ path: 'artifacts/browser-mobile.png', fullPage: true })
   assert.deepEqual(errors, [], 'no browser JS errors')
   assert.deepEqual(external, [], 'all page resources must use the application origin')
+  // Keep a real editor open across a server outage longer than the room TTL.
+  const retentionDatabase = join(dir, 'retention.db')
+  let retentionServer = await startServer(retentionDatabase, ['-room-ttl', '2s'])
+  const staleContext = await browser.newContext({ acceptDownloads: true })
+  try {
+    const stale = await staleContext.newPage()
+    const retentionErrors = []
+    stale.on('pageerror', error => retentionErrors.push(String(error)))
+    await stale.goto(retentionServer.url)
+    await waitFor(async () => (await stale.locator('#status').textContent()) === 'Подключено', 'retention browser connects')
+    const expiredUrl = stale.url(), oldId = new URL(expiredUrl).pathname.slice(1)
+    await stale.locator('.cm-content').click()
+    await stale.keyboard.insertText('saved before restart\n')
+    const address = new URL(retentionServer.url).host
+    await retentionServer.stop()
+    await stale.keyboard.insertText('offline draft preserved 🐾\n')
+    await sleep(2200)
+    retentionServer = await startServer(retentionDatabase, ['-room-ttl', '2s', '-addr', address])
+    await waitFor(async () => (await stale.locator('#status').textContent()) === 'Срок хранения комнаты истёк', 'expired stale tab stops reconnecting')
+    assert((await editorText(stale)).includes('offline draft preserved 🐾'))
+    assert.equal(await stale.locator('.cm-content').getAttribute('contenteditable'), 'false')
+    const [preserved] = await Promise.all([stale.waitForEvent('download'), stale.click('#download')])
+    const preservedText = await readFile(await preserved.path(), 'utf8')
+    assert(preservedText.includes('saved before restart') && preservedText.includes('offline draft preserved 🐾'))
+    const expiredPage = await stale.reload()
+    assert.equal(expiredPage.status(), 410)
+    assert((await stale.locator('h1').textContent()).includes('Срок хранения'))
+    await stale.goto(`${retentionServer.url}/#${oldId}`)
+    await waitFor(async () => (await stale.locator('#status').textContent()) === 'Срок хранения комнаты истёк', 'expired legacy page is explicit')
+    await stale.click('#new-room')
+    await waitFor(async () => (await stale.locator('#status').textContent()) === 'Подключено', 'new room after expiration')
+    assert.notEqual(new URL(stale.url()).pathname, `/${oldId}`)
+    assert.deepEqual(retentionErrors, [], 'expiration is a normal UI state, without JS exceptions')
+    console.log('PASS: expired browser tab keeps offline draft downloadable, freezes editing, reports 410 and creates a fresh room')
+  } finally {
+    try { await staleContext.close() }
+    finally { await retentionServer.stop() }
+  }
   console.log('PASS: Text and .txt download, short room URLs/reload/new room, legacy links, Python/SQL highlighting, local-only undo/redo, shared language, mobile layout, same-origin resources')
 } finally {
   try { if (browser) await browser.close() }

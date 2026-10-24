@@ -5,6 +5,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type Config struct {
@@ -14,16 +15,21 @@ type Config struct {
 	MaxPeers        int
 	MaxMessageBytes int64
 	Metrics         bool
+	RoomTTL         time.Duration
 }
 
 func DefaultConfig() Config {
 	return Config{
 		Address: "127.0.0.1:8080", Database: "data/kosha.db",
 		MaxRooms: 5, MaxPeers: 5, MaxMessageBytes: 1 << 20,
+		RoomTTL: 14 * 24 * time.Hour,
 	}
 }
 
 func (c Config) Validate() error {
+	if c.RoomTTL <= 0 {
+		return errors.New("room TTL must be positive (KOSHA_ROOM_TTL or -room-ttl)")
+	}
 	host, port, err := net.SplitHostPort(c.Address)
 	if err != nil || (strings.Contains(host, ":") && net.ParseIP(host) == nil) {
 		return errors.New("listen address must contain a valid host and numeric port (KOSHA_HOST/KOSHA_PORT or -addr)")

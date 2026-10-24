@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/reearth/ygo/persistence/sqlite"
 )
@@ -24,7 +25,7 @@ func roomRegistry(t *testing.T, source io.Reader) (*roomRegistryStore, string) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = store.Close() })
-	registry, err := openRoomRegistry(path, source)
+	registry, err := openRoomRegistry(path, source, DefaultConfig().RoomTTL, time.Now)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,7 +53,7 @@ func TestShortCodeCollisionAndPersistence(t *testing.T) {
 	if err := r.Close(); err != nil {
 		t.Fatal(err)
 	}
-	reopened, err := openRoomRegistry(path, rand.Reader)
+	reopened, err := openRoomRegistry(path, rand.Reader, DefaultConfig().RoomTTL, time.Now)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,7 +68,7 @@ func TestShortCodeCollisionAndPersistence(t *testing.T) {
 
 func TestShortCodeConcurrentAllocation(t *testing.T) {
 	a, path := roomRegistry(t, rand.Reader)
-	b, err := openRoomRegistry(path, rand.Reader)
+	b, err := openRoomRegistry(path, rand.Reader, DefaultConfig().RoomTTL, time.Now)
 	if err != nil {
 		t.Fatal(err)
 	}

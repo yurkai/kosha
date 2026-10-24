@@ -16,7 +16,7 @@ import (
 
 func TestDefaultsAndValidation(t *testing.T) {
 	cfg := DefaultConfig()
-	if cfg.Address != "127.0.0.1:8080" || cfg.MaxRooms != 5 || cfg.MaxPeers != 5 {
+	if cfg.Address != "127.0.0.1:8080" || cfg.MaxRooms != 5 || cfg.MaxPeers != 5 || cfg.RoomTTL != 14*24*time.Hour {
 		t.Fatalf("unexpected defaults: %+v", cfg)
 	}
 	for _, mutate := range []func(*Config){
@@ -25,6 +25,8 @@ func TestDefaultsAndValidation(t *testing.T) {
 		func(c *Config) { c.MaxRooms = 0 },
 		func(c *Config) { c.MaxPeers = 0 },
 		func(c *Config) { c.MaxMessageBytes = 0 },
+		func(c *Config) { c.RoomTTL = 0 },
+		func(c *Config) { c.RoomTTL = -time.Hour },
 	} {
 		bad := cfg
 		mutate(&bad)
