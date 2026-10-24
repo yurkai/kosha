@@ -11,13 +11,28 @@ import { yCollab, yUndoManagerKeymap } from 'y-codemirror.next'
 import './style.css'
 
 const element = <T extends HTMLElement>(id: string) => document.getElementById(id) as T
-const roomId = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, '0')).join('')
-const room = location.hash.slice(1) || roomId()
+const createRoom = async () => {
+  const response = await fetch('/api/rooms', { method: 'POST' })
+  if (!response.ok) throw new Error('Не удалось создать комнату. Попробуйте ещё раз.')
+  const room: { id: string } = await response.json()
+  if (!/^[A-Z0-9]{6}$/.test(room.id)) throw new Error('Сервер вернул неверную ссылку комнаты.')
+  return room.id
+}
+const legacyRoom = location.pathname === '/' ? location.hash.slice(1) : ''
+let room = legacyRoom || location.pathname.slice(1)
+if (!room) {
+  try {
+    room = await createRoom()
+    history.replaceState(null, '', `/${room}`)
+  } catch (error) {
+    element('status').textContent = 'Не удалось создать комнату. Обновите страницу.'
+    throw error
+  }
+}
 if (!/^[A-Za-z0-9_-]{1,64}$/.test(room)) {
   element('status').textContent = 'Неверная ссылка комнаты'
   throw new Error('Invalid room name')
 }
-if (!location.hash) history.replaceState(null, '', `#${room}`)
 window.addEventListener('hashchange', () => location.reload())
 
 const doc = new Y.Doc()
@@ -27,6 +42,15 @@ const socketUrl = `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${locatio
 const provider = new WebsocketProvider(socketUrl, room, doc, { disableBc: true })
 const syntax = new Compartment()
 const language = element<HTMLSelectElement>('language')
+const modes = {
+  python: { syntax: python, extension: 'py' },
+  sql: { syntax: sql, extension: 'sql' },
+  text: { syntax: () => [], extension: 'txt' },
+}
+const selectedMode = () => {
+  const current = settings.get('language')
+  return current === 'sql' || current === 'text' ? current : 'python'
+}
 const name = element<HTMLInputElement>('name')
 name.value = `Гость ${doc.clientID.toString().slice(-4)}`
 const color = ['#4969ba', '#b14c74', '#258674', '#a46a29'][doc.clientID % 4]
@@ -46,13 +70,13 @@ const view = new EditorView({
     syntax.of(python()),
     yCollab(text, provider.awareness, { undoManager: new Y.UndoManager(text) }),
     EditorView.theme({ '&': { height: '100%' }, '.cm-scroller': { overflow: 'auto' } }),
-    EditorView.contentAttributes.of({ 'aria-label': 'Код', spellcheck: 'false' }),
+    EditorView.contentAttributes.of({ 'aria-label': 'Текст документа', spellcheck: 'false' }),
   ],
 })
 
 const updateLanguage = () => {
-  language.value = settings.get('language') === 'sql' ? 'sql' : 'python'
-  view.dispatch({ effects: syntax.reconfigure(language.value === 'sql' ? sql() : python()) })
+  language.value = selectedMode()
+  view.dispatch({ effects: syntax.reconfigure(modes[selectedMode()].syntax()) })
 }
 settings.observe(updateLanguage)
 language.addEventListener('change', () => settings.set('language', language.value))
@@ -74,15 +98,18 @@ element('share').addEventListener('click', async () => {
   try { await navigator.clipboard.writeText(location.href); notice('Ссылка скопирована. Все, у кого она есть, могут редактировать.') }
   catch { notice('Скопируйте ссылку из адресной строки.') }
 })
-element('new-room').addEventListener('click', () => {
+element<HTMLButtonElement>('new-room').addEventListener('click', async () => {
   if (!provider.synced && text.length && !confirm('Есть правки без соединения. Скачайте текст перед переходом. Всё равно открыть новую комнату?')) return
-  location.hash = roomId()
+  const button = element<HTMLButtonElement>('new-room')
+  button.disabled = true
+  try { location.assign(`/${await createRoom()}`) }
+  catch { notice('Не удалось создать комнату. Попробуйте ещё раз.'); button.disabled = false }
 })
 element('download').addEventListener('click', () => {
   const url = URL.createObjectURL(new Blob([text.toString()], { type: 'text/plain;charset=utf-8' }))
   const a = document.createElement('a')
   a.href = url
-  a.download = `kosha.${language.value === 'sql' ? 'sql' : 'py'}`
+  a.download = `kosha.${modes[selectedMode()].extension}`
   a.click()
   URL.revokeObjectURL(url)
 })

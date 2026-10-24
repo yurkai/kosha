@@ -5,6 +5,7 @@ go 1.26.0
 require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/reearth/ygo v1.54.0
+	modernc.org/sqlite v1.39.0
 )
 
 require (
@@ -20,5 +21,4 @@ require (
 	modernc.org/libc v1.66.3 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
-	modernc.org/sqlite v1.39.0 // indirect
 )

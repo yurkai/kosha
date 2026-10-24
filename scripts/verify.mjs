@@ -42,7 +42,9 @@ try {
   server = await startServer(database)
   report.server_pid = server.child.pid
   await sample('idle')
-  const a = client('functional'), b = client('functional'), other = client('isolated')
+  const functionalRoom = await server.createRoom()
+  const isolatedRoom = await server.createRoom()
+  const a = client(functionalRoom), b = client(functionalRoom), other = client(isolatedRoom)
   await Promise.all(clients.map(c => c.ready()))
   a.text.insert(0, 'alpha: Привет 👋\n')
   b.text.insert(0, 'beta: SELECT 1;\n')
@@ -66,22 +68,30 @@ try {
   assert.equal(a.text.toString().split('ONLINE').length - 1, 1)
   report.checks.offline_edits_and_reconnection = 'PASS'
 
+  a.doc.getMap('settings').set('language', 'text')
+  await waitFor(() => b.doc.getMap('settings').get('language') === 'text', 'shared Text metadata')
+
   const expected = a.text.toString()
   // Keep clients connected: SIGTERM must drain pending writes, not rely on room eviction.
   await server.stop()
   destroyClients()
   server = await startServer(database)
-  const restored = client('functional'), fresh = client('functional')
+  const restored = client(functionalRoom), fresh = client(functionalRoom)
   await Promise.all(clients.map(c => c.ready()))
   assert.equal(restored.text.toString(), expected, 'new process must restore SQLite state')
   assert.equal(fresh.text.toString(), expected, 'new Y.Doc must not duplicate restored content')
+  assert.equal(restored.doc.getMap('settings').get('language'), 'text', 'Text mode must survive process restart')
+  const roomPage = await fetch(`${server.url}/${functionalRoom}`)
+  assert.equal(roomPage.status, 200, 'short URL must survive process restart')
   report.checks.sqlite_recovery_after_process_restart = 'PASS'
+  report.checks.short_url_and_text_mode_after_restart = 'PASS'
   destroyClients()
   await waitFor(async () => (await server.metrics()).resident_rooms === 0, 'functional rooms unload')
   report.server_pid = server.child.pid
   await sample('before_load')
 
-  const groups = Array.from({ length: 5 }, (_, r) => Array.from({ length: 4 }, () => client(`load-${r}`)))
+  const loadRooms = await Promise.all(Array.from({ length: 5 }, () => server.createRoom()))
+  const groups = loadRooms.map(room => Array.from({ length: 4 }, () => client(room)))
   await Promise.all(clients.map(c => c.ready()))
   for (const [r, peers] of groups.entries()) {
     const marker = `# room ${r}\n`
@@ -149,7 +159,7 @@ try {
 
   // Repeat full joins/leaves to catch obvious room retention and rehydration failures.
   for (let cycle = 0; cycle < 2; cycle++) {
-    const again = groups.map((_, r) => Array.from({ length: 4 }, () => client(`load-${r}`)))
+    const again = loadRooms.map(room => Array.from({ length: 4 }, () => client(room)))
     await Promise.all(clients.map(c => c.ready()))
     for (const [r, peers] of again.entries()) for (const c of peers) assert.equal(c.text.toString(), expectedRooms[r])
     await sample(`churn_${cycle}_connected`)

@@ -43,6 +43,13 @@ export async function startServer(database, args = []) {
     if (!response.ok) throw new Error('Server health check failed')
     return {
       child, url, logs: () => logs,
+      async createRoom() {
+        const response = await fetch(`${url}/api/rooms`, { method: 'POST' })
+        if (response.status !== 201) throw new Error(`Room creation HTTP ${response.status}`)
+        const room = await response.json()
+        if (!/^[A-Z0-9]{6}$/.test(room.id) || room.path !== `/${room.id}`) throw new Error('Invalid short room response')
+        return room.id
+      },
       async metrics() {
         const response = await fetch(`${url}/debug/metrics`)
         if (!response.ok) throw new Error(`Metrics HTTP ${response.status}`)

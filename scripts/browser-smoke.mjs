@@ -20,6 +20,29 @@ try {
     p.on('pageerror', error => errors.push(String(error)))
     p.on('request', request => { if (!request.url().startsWith(server.url)) external.push(request.url()) })
   }
+  // Opening the landing page must allocate a short, directly reloadable URL.
+  await page.goto(server.url)
+  await waitFor(() => /^\/[A-Z0-9]{6}$/.test(new URL(page.url()).pathname), 'six-character room path')
+  const shortUrl = page.url()
+  await peer.goto(shortUrl)
+  await waitFor(async () => (await peer.locator('#status').textContent()) === 'Подключено', 'join by short URL')
+  await page.selectOption('#language', 'text')
+  await waitFor(async () => (await peer.locator('#language').inputValue()) === 'text', 'shared Text mode')
+  await page.locator('.cm-content').click()
+  await page.keyboard.insertText('SELECT name FROM users;\ndef greet():\n    return "обычный текст"\n')
+  const plain = page.locator('.cm-line span').filter({ hasText: /^(SELECT|def|return)$/ })
+  assert.equal(await plain.count(), 0, 'Text must not highlight language tokens')
+  const [download] = await Promise.all([page.waitForEvent('download'), page.click('#download')])
+  assert.equal(download.suggestedFilename(), 'kosha.txt')
+  await page.reload()
+  await waitFor(async () => (await page.locator('#status').textContent()) === 'Подключено', 'short URL refresh')
+  assert.equal(page.url(), shortUrl)
+  assert.equal(await page.locator('#language').inputValue(), 'text')
+  await page.click('#new-room')
+  await waitFor(() => page.url() !== shortUrl && /^\/[A-Z0-9]{6}$/.test(new URL(page.url()).pathname), 'new short room')
+  assert.equal((await page.locator('.cm-content').textContent())?.trim(), '', 'new room must be empty')
+
+  // Preserve the old fragment-based room names and their document identity.
   const url = `${server.url}/#browser-smoke`
   await Promise.all([page.goto(url), peer.goto(url)])
   await waitFor(async () => (await page.locator('#status').textContent()) === 'Подключено' && (await peer.locator('#status').textContent()) === 'Подключено', 'browser clients connect')
@@ -61,7 +84,7 @@ try {
   await page.screenshot({ path: 'artifacts/browser-mobile.png', fullPage: true })
   assert.deepEqual(errors, [], 'no browser JS errors')
   assert.deepEqual(external, [], 'all page resources must use the application origin')
-  console.log('PASS: two isolated browser contexts, Python/SQL highlighting, editing, local-only undo/redo, shared language, refresh, mobile layout, same-origin resources')
+  console.log('PASS: Text and .txt download, short room URLs/reload/new room, legacy links, Python/SQL highlighting, local-only undo/redo, shared language, mobile layout, same-origin resources')
 } finally {
   try { if (browser) await browser.close() }
   finally { await server.stop() }
