@@ -16,15 +16,15 @@ import (
 )
 
 func main() {
-	cfg := server.DefaultConfig()
-	flag.StringVar(&cfg.Address, "addr", cfg.Address, "HTTP listen address")
-	flag.StringVar(&cfg.Database, "db", cfg.Database, "persistent SQLite file")
-	flag.IntVar(&cfg.MaxRooms, "max-rooms", cfg.MaxRooms, "maximum resident rooms")
-	flag.IntVar(&cfg.MaxPeers, "max-peers", cfg.MaxPeers, "maximum participants per room")
-	flag.Int64Var(&cfg.MaxMessageBytes, "max-message-bytes", cfg.MaxMessageBytes, "maximum incoming WebSocket message size")
-	flag.BoolVar(&cfg.Metrics, "metrics", false, "enable diagnostic /debug/metrics (keep private)")
-	flag.Parse()
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, nil)))
+	cfg, err := parseConfig(os.Args[1:], os.LookupEnv, os.Stderr)
+	if errors.Is(err, flag.ErrHelp) {
+		return
+	}
+	if err != nil {
+		slog.Error("invalid configuration", "error", err)
+		os.Exit(2)
+	}
 	if err := run(cfg); err != nil {
 		slog.Error("server stopped", "error", err)
 		os.Exit(1)
