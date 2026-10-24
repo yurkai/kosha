@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="referrer" content="no-referrer" />
+    <meta name="theme-color" content="#f5f4f0" />
+    <title>Kosha — код вместе</title>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="brand"><strong>Kosha<span>●</span></strong><span class="tagline">код вместе</span></div>
+        <div class="connection"><i id="connection-dot"></i><span id="status" role="status">Подключение…</span></div>
+      </header>
+      <section class="toolbar" aria-label="Настройки редактора">
+        <label>Язык <select id="language"><option value="python">Python</option><option value="sql">SQL</option></select></label>
+        <label>Ваше имя <input id="name" maxlength="32" autocomplete="off" /></label>
+        <span id="participants">1 участник</span>
+        <div class="actions">
+          <button id="download">Скачать</button>
+          <button id="new-room">Новая комната</button>
+          <button id="share" class="primary">Копировать ссылку</button>
+        </div>
+      </section>
+      <div id="editor" aria-label="Совместный редактор кода"></div>
+      <footer><span>Одна ссылка. Один общий документ.</span><span>Только редактирование · код не запускается</span></footer>
+      <p id="notice" role="status" aria-live="polite"></p>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

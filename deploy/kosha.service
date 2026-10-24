@@ -1,0 +1,27 @@
+[Unit]
+Description=Kosha collaborative code editor
+After=network.target
+
+[Service]
+Type=simple
+User=kosha
+Group=kosha
+StateDirectory=kosha
+StateDirectoryMode=0700
+WorkingDirectory=/var/lib/kosha
+ExecStart=/opt/kosha/kosha -addr 127.0.0.1:8080 -db /var/lib/kosha/kosha.db
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=20
+UMask=0077
+Environment=GOMEMLIMIT=192MiB
+MemoryHigh=192M
+MemoryMax=256M
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/kosha
+
+[Install]
+WantedBy=multi-user.target
