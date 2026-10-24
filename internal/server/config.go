@@ -2,6 +2,8 @@ package server
 
 import (
 	"errors"
+	"net"
+	"strconv"
 	"strings"
 )
 
@@ -22,6 +24,14 @@ func DefaultConfig() Config {
 }
 
 func (c Config) Validate() error {
+	host, port, err := net.SplitHostPort(c.Address)
+	if err != nil || (strings.Contains(host, ":") && net.ParseIP(host) == nil) {
+		return errors.New("listen address must contain a valid host and numeric port (KOSHA_HOST/KOSHA_PORT or -addr)")
+	}
+	portNumber, err := strconv.Atoi(port)
+	if err != nil || portNumber < 0 || portNumber > 65535 {
+		return errors.New("listen port must be 0..65535 (KOSHA_PORT or -addr)")
+	}
 	if c.Database == "" || c.Database == ":memory:" || strings.HasPrefix(c.Database, "file:") {
 		return errors.New("database must be a persistent filesystem path")
 	}

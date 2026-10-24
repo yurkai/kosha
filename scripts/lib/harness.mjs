@@ -18,10 +18,13 @@ export async function waitFor(predicate, label, timeout = 15_000) {
   throw new Error(`Timed out: ${label}`)
 }
 
-export async function startServer(database, args = []) {
+export async function startServer(database, args = [], { envFile = '', address: listenAddress = '127.0.0.1:0', env = {} } = {}) {
+  // Personal settings must not change the limits or ports of automated checks.
+  const processEnv = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('KOSHA_')))
   const child = spawn(resolve(process.env.KOSHA_BINARY || 'bin/kosha'), [
-    '-addr', '127.0.0.1:0', '-db', database, '-metrics', ...args,
-  ], { stdio: ['ignore', 'pipe', 'pipe'] })
+    '-env-file', envFile, ...(listenAddress === null ? [] : ['-addr', listenAddress]),
+    '-db', database, '-metrics', ...args,
+  ], { stdio: ['ignore', 'pipe', 'pipe'], env: { ...processEnv, ...env } })
   let logs = ''
   let address
   let spawnError

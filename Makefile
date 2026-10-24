@@ -5,7 +5,7 @@ export GOCACHE := $(CURDIR)/.cache/go-build
 export npm_config_cache := $(CURDIR)/.cache/npm
 TARGET_ARCH ?= amd64
 
-.PHONY: deps web build run test check verify browser linux clean
+.PHONY: deps web build run test check config verify browser linux clean
 
 deps:
 	go mod download
@@ -29,7 +29,11 @@ test: web
 check: test
 	git diff --check
 
+config: build
+	npm run test:config
+
 verify: build
+	npm run test:config
 	npm run test:integration -- --duration=60
 
 browser: build
