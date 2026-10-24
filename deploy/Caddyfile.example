@@ -1,0 +1,10 @@
+# Replace the domain and generate the hash with: caddy hash-password
+code.example.com {
+	encode zstd gzip
+	basic_auth {
+		owner REPLACE_WITH_CADDY_PASSWORD_HASH
+	}
+	@diagnostics path /debug/*
+	respond @diagnostics 404
+	reverse_proxy 127.0.0.1:8080
+}

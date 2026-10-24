@@ -1,0 +1,26 @@
+# Local development context must never be tracked or published.
+/dev/
+/human/
+AGENTS.md
+AGENTS.local.md
+CLAUDE.md
+.agents/
+.codex/
+
+# Dependencies, generated output and local state.
+.cache/
+node_modules/
+/bin/
+/web/dist/
+/data/
+/artifacts/
+coverage.out
+*.test
+*.prof
+*.db
+*.db-shm
+*.db-wal
+.DS_Store
+.env
+.env.*
+!.env.example
